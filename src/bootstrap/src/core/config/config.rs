@@ -1964,16 +1964,20 @@ NOTE: Please add `--stage 2` to your command line, or if you're sure you want to
         self.enabled_codegen_backends(target).first().unwrap()
     }
 
-    pub fn override_allocator(&self, target: TargetSelection) -> Option<OverrideAllocator> {
-        let result = self.target_config
+    pub fn override_allocator(&self, target: TargetSelection) -> OverrideAllocator {
+        let result = self
+            .target_config
             .get(&target)
             .and_then(|cfg| cfg.override_allocator)
-            .or(self.override_allocator);
-        println!("Config::override_allocator: target={:?}, rust.override_allocator={:?}, target.override_allocator={:?}, result={:?}",
-                target,
-                self.override_allocator,
-                self.target_config.get(&target).and_then(|cfg| cfg.override_allocator),
-                result);
+            .or(self.override_allocator)
+            .unwrap_or(OverrideAllocator::System);
+        println!(
+            "Config::override_allocator: target={:?}, rust.override_allocator={:?}, target.override_allocator={:?}, result={:?}",
+            target,
+            self.override_allocator,
+            self.target_config.get(&target).and_then(|cfg| cfg.override_allocator),
+            result
+        );
         result
     }
 
@@ -2070,35 +2074,41 @@ impl AsRef<ExecutionContext> for Config {
 /// Reconciles the deprecated `jemalloc` boolean option with the new
 /// `override-allocator` option.
 ///
-/// Emits a warning if `jemalloc` is present and errors out if it is set but
-/// `override-allocator` is not `jemalloc`. The allocator is overridden if
-/// either option is set.
+/// Emits a warning if `jemalloc` is set, and an error if *both* `jemalloc` and `override-allocator` are set.
 fn reconcile_jemalloc(
     jemalloc: Option<bool>,
     override_allocator: Option<OverrideAllocator>,
     section: &str,
 ) -> Option<OverrideAllocator> {
-    if let Some(jemalloc) = jemalloc {
-        println!(
-            "WARNING: The `{section}.jemalloc` option is deprecated. \
-             Use `{section}.override-allocator` instead.",
-        );
-        if jemalloc && override_allocator.is_some_and(|a| a != OverrideAllocator::Jemalloc) {
-            panic!(
-                "ERROR: `{section}.jemalloc` is set but `{section}.override-allocator` is \
-                 not `jemalloc` ({:?}). Remove the deprecated `jemalloc` option or set \
-                 `override-allocator = \"jemalloc\"`.",
-                override_allocator,
+    let result = match (jemalloc, override_allocator) {
+        (None, None) => None,
+        (None, Some(allocator)) => Some(allocator),
+        (Some(true), None) => {
+            println!(
+                "WARNING: The `{section}.jemalloc` option is deprecated. \
+                 Use `{section}.override-allocator = \"jemalloc\"` instead of `{section}.jemalloc = true`",
             );
+            Some(OverrideAllocator::Jemalloc)
         }
-    }
-    let result = override_allocator.or(if jemalloc == Some(true) {
-        Some(OverrideAllocator::Jemalloc)
-    } else {
-        None
-    });
-    println!("reconcile_jemalloc: section={:?}, jemalloc = {:?}, override_allocator = {:?}, result = {:?}",
-             section, jemalloc, override_allocator, result);
+        (Some(false), None) => {
+            println!(
+                "WARNING: The `{section}.jemalloc` option is deprecated. \
+                 Use `{section}.override-allocator = \"system\"` instead of `{section}.jemalloc = false`",
+            );
+            Some(OverrideAllocator::System)
+        }
+        _ => {
+            panic!(
+                "ERROR: `{section}.jemalloc` and `{section}.override-allocator` are both set. \
+                 Please remove the outdated `{section}.jemalloc` directive."
+            )
+        }
+    };
+
+    println!(
+        "reconcile_jemalloc: section={:?}, jemalloc = {:?}, override_allocator = {:?}, result = {:?}",
+        section, jemalloc, override_allocator, result
+    );
     result
 }
 
