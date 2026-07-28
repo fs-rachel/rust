@@ -1965,10 +1965,16 @@ NOTE: Please add `--stage 2` to your command line, or if you're sure you want to
     }
 
     pub fn override_allocator(&self, target: TargetSelection) -> Option<OverrideAllocator> {
-        self.target_config
+        let result = self.target_config
             .get(&target)
             .and_then(|cfg| cfg.override_allocator)
-            .or(self.override_allocator)
+            .or(self.override_allocator);
+        println!("Config::override_allocator: target={:?}, rust.override_allocator={:?}, target.override_allocator={:?}, result={:?}",
+                target,
+                self.override_allocator,
+                self.target_config.get(&target).and_then(|cfg| cfg.override_allocator),
+                result);
+        result
     }
 
     pub fn rpath_enabled(&self, target: TargetSelection) -> bool {
@@ -2086,11 +2092,14 @@ fn reconcile_jemalloc(
             );
         }
     }
-    override_allocator.or(if jemalloc == Some(true) {
+    let result = override_allocator.or(if jemalloc == Some(true) {
         Some(OverrideAllocator::Jemalloc)
     } else {
         None
-    })
+    });
+    println!("reconcile_jemalloc: section={:?}, jemalloc = {:?}, override_allocator = {:?}, result = {:?}",
+             section, jemalloc, override_allocator, result);
+    result
 }
 
 fn compute_src_directory(src_dir: Option<PathBuf>, exec_ctx: &ExecutionContext) -> Option<PathBuf> {
