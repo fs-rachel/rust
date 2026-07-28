@@ -661,4 +661,9 @@ pub const CONFIG_CHANGE_HISTORY: &[ChangeInfo] = &[
         severity: ChangeSeverity::Warning,
         summary: "Obsolete option `build.compiletest-use-stage0-libtest` has no effect and has been removed.",
     },
+    ChangeInfo {
+        change_id: 159879,
+        severity: ChangeSeverity::Warning,
+        summary: "The `override-allocator` option has been renamed to `allocator`, and can now be set to 'system' to explicitly request the system allocator",
+    },
 ];
